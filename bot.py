@@ -1,35 +1,63 @@
-import os
-
 import discord
-from dotenv import load_dotenv
+from discord.ext import commands
 
-load_dotenv()
+from config.settings import GEMINI_API_KEY, DISCORD_TOKEN, validate_settings
+from ai.router import AIRouter
 
-TOKEN = os.getenv("DISCORD_TOKEN")
 
-if not TOKEN:
-    raise RuntimeError("DISCORD_TOKEN is not set.")
+validate_settings()
 
 
 intents = discord.Intents.default()
 intents.message_content = True
 
-client = discord.Client(intents=intents)
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents,
+)
+
+ai = AIRouter(GEMINI_API_KEY)
 
 
-@client.event
+@bot.event
 async def on_ready():
-    print(f"Logged in as {client.user}")
+    print(f"Logged in as {bot.user}")
     print("HexxaAI is online!")
 
 
-@client.event
+@bot.event
 async def on_message(message):
     if message.author.bot:
         return
 
     if message.content.lower() == "!ping":
         await message.channel.send("Pong! 🤖")
+        return
+
+    if bot.user in message.mentions:
+        prompt = message.content.replace(
+            f"<@{bot.user.id}>",
+            "",
+        ).strip()
+
+        if not prompt:
+            await message.channel.send(
+                "You mentioned me! What do you want to talk about? 🤖"
+            )
+            return
+
+        try:
+            response = await ai.generate(prompt)
+            await message.channel.send(response)
+
+        except Exception as error:
+            print(f"AI error: {error}")
+
+            await message.channel.send(
+                "Something went wrong while contacting my AI provider. 😭"
+            )
+
+    await bot.process_commands(message)
 
 
-client.run(TOKEN)
+bot.run(DISCORD_TOKEN)
