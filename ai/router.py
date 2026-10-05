@@ -1,11 +1,24 @@
-from ai.providers.gemini import GeminiProvider
+from ai.providers.base import AIProvider
 
 
 class AIRouter:
-    """Routes AI requests to the configured provider."""
+    """Routes AI requests through the configured provider."""
 
-    def __init__(self, gemini_api_key: str):
-        self.gemini = GeminiProvider(gemini_api_key)
+    def __init__(self, provider: AIProvider):
+        self.provider = provider
 
     async def generate(self, prompt: str) -> str:
-        return await self.gemini.generate(prompt)
+        """Generate a response using the active AI provider."""
+
+        return await self.provider.generate(prompt)
+
+    async def close(self) -> None:
+        """Close the active AI provider."""
+
+        await self.provider.close()
+
+    @property
+    def provider_name(self) -> str:
+        """Return the active provider name."""
+
+        return self.provider.name
