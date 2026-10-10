@@ -17,8 +17,13 @@ class AIProvider(ABC):
     name = "unknown"
 
     @abstractmethod
-    async def generate(self, prompt: str) -> str:
-        """Generate a response from a prompt."""
+    async def generate(
+        self,
+        prompt: str,
+        model: str | None = None,
+        system_prompt: str | None = None,
+    ) -> str:
+        """Generate a response using the selected model."""
         raise NotImplementedError
 
     async def close(self) -> None:

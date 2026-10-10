@@ -11,15 +11,19 @@ class GeminiProvider(AIProvider):
     """Gemini implementation of the HexxaAI AI provider interface."""
 
     name = "Gemini"
-    MODEL = "gemini-3-flash-preview"
+
+    DEFAULT_MODEL = "gemini-3-flash-preview"
     TIMEOUT_SECONDS = 60
 
     def __init__(self, api_key: str):
         self.client = genai.Client(api_key=api_key).aio
 
-    async def generate(self, prompt: str) -> str:
-        """Generate a response from Gemini."""
-
+    async def generate(
+        self,
+        prompt: str,
+        model: str | None = None,
+        system_prompt: str | None = None,
+    ) -> str:
         prompt = prompt.strip()
 
         if not prompt:
@@ -28,22 +32,29 @@ class GeminiProvider(AIProvider):
                 "The AI prompt was empty.",
             )
 
+        selected_model = model or self.DEFAULT_MODEL
+
+        config = {
+            "temperature": 0.7,
+        }
+
+        if system_prompt:
+            config["system_instruction"] = system_prompt
+
         try:
             response = await asyncio.wait_for(
-              self.client.models.generate_content(
-                model=self.MODEL,
-                contents=prompt,
-                config={
-                  "temperature": 0.7,
-                },
-              ),
-              timeout=self.TIMEOUT_SECONDS,
+                self.client.models.generate_content(
+                    model=selected_model,
+                    contents=prompt,
+                    config=config,
+                ),
+                timeout=self.TIMEOUT_SECONDS,
             )
 
         except asyncio.TimeoutError as error:
             raise AIProviderError(
                 "timeout",
-                "Gemini took too long to respond.",
+                f"Gemini model '{selected_model}' took too long to respond.",
             ) from error
 
         except genai_errors.APIError as error:
@@ -52,19 +63,15 @@ class GeminiProvider(AIProvider):
             if status_code in (401, 403):
                 category = "authentication"
                 message = "Gemini authentication failed."
-
             elif status_code == 429:
                 category = "rate_limit"
                 message = "Gemini rate limit reached."
-
             elif status_code == 400:
                 category = "invalid_request"
                 message = "Gemini rejected the request."
-
             elif status_code is not None and status_code >= 500:
                 category = "service"
                 message = "Gemini is temporarily unavailable."
-
             else:
                 category = "provider"
                 message = "Gemini returned an API error."
@@ -94,6 +101,4 @@ class GeminiProvider(AIProvider):
         return response_text.strip()
 
     async def close(self) -> None:
-        """Close the asynchronous Gemini client."""
-
         await self.client.aclose()
